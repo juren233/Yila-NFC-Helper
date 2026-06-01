@@ -33,7 +33,7 @@ android {
 
     defaultConfig {
         applicationId = "com.juren233.nfcunlocker"
-        minSdk = 21
+        minSdk = 26
         targetSdk = 35
         versionCode = 4
         versionName = "1.2.0"
