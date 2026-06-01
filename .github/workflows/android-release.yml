@@ -1,0 +1,164 @@
+name: Android Release Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Load build config
+        id: config
+        shell: bash
+        run: |
+          set -a
+          source .github/build-config.properties
+          set +a
+
+          echo "build_enabled=${BUILD_ENABLED:-true}" >> "$GITHUB_OUTPUT"
+          echo "create_release=${CREATE_RELEASE:-false}" >> "$GITHUB_OUTPUT"
+          echo "target_abis=${TARGET_ABIS:-arm64-v8a}" >> "$GITHUB_OUTPUT"
+          echo "release_name_prefix=${RELEASE_NAME_PREFIX:-Yila NFC Helper}" >> "$GITHUB_OUTPUT"
+
+      - name: Stop when build is disabled
+        if: steps.config.outputs.build_enabled != 'true'
+        run: echo "Build is disabled by .github/build-config.properties"
+
+      - name: Set up JDK 21
+        if: steps.config.outputs.build_enabled == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Prepare Gradle wrapper
+        if: steps.config.outputs.build_enabled == 'true'
+        run: chmod +x ./gradlew
+
+      - name: Read app version
+        if: steps.config.outputs.build_enabled == 'true'
+        id: app_version
+        shell: bash
+        run: |
+          version_name="$(grep -E 'versionName[[:space:]]*=' app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/' | head -n 1)"
+
+          if [[ -z "$version_name" ]]; then
+            echo "Failed to read versionName from app/build.gradle.kts" >&2
+            exit 1
+          fi
+
+          echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
+
+      - name: Restore signing config
+        if: steps.config.outputs.build_enabled == 'true'
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [[ -z "$ANDROID_KEYSTORE_BASE64" || -z "$ANDROID_KEYSTORE_PASSWORD" || -z "$ANDROID_KEY_ALIAS" || -z "$ANDROID_KEY_PASSWORD" ]]; then
+            echo "::error::Missing signing secrets. Configure ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD in repository secrets."
+            exit 1
+          fi
+
+          mkdir -p keystore
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > keystore/nfcunlocker-formal.jks
+          {
+            echo "storeFile=keystore/nfcunlocker-formal.jks"
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+          } > keystore/signing.properties
+
+      - name: Build release APK
+        if: steps.config.outputs.build_enabled == 'true'
+        run: ./gradlew :app:assembleRelease -Pnfcunlocker.targetAbis="${{ steps.config.outputs.target_abis }}" --stacktrace
+
+      - name: Collect APK artifacts
+        if: steps.config.outputs.build_enabled == 'true'
+        shell: bash
+        run: |
+          mkdir -p release
+          find app/build/outputs/apk/release -maxdepth 1 -type f -name "*.apk" -print -exec cp {} release/ \;
+          test -n "$(find release -maxdepth 1 -type f -name '*.apk' -print -quit)"
+
+      - name: Write release notes
+        if: steps.config.outputs.build_enabled == 'true'
+        shell: bash
+        run: |
+          {
+            echo "## Latest commit"
+            echo
+            echo "- Commit: \`$(git rev-parse HEAD)\`"
+            echo "- Author: $(git log -1 --pretty=format:'%an <%ae>')"
+            echo "- Date: $(git log -1 --pretty=format:'%cI')"
+            echo
+            echo "### Message"
+            echo
+            git log -1 --pretty=format:'%B'
+            echo
+            echo
+            echo "### Changed files"
+            echo
+            git show --name-status --format="" HEAD
+            echo
+            echo
+            echo "### Diff stat"
+            echo
+            git show --stat --format="" HEAD
+            echo
+            echo
+            echo "## Build config"
+            echo
+            echo "- Target ABIs: ${{ steps.config.outputs.target_abis }}"
+          } > release/release-notes.md
+
+      - name: Upload APK artifact
+        if: steps.config.outputs.build_enabled == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: yila-nfc-helper-apk
+          path: release/*.apk
+          if-no-files-found: error
+
+      - name: Prepare release metadata
+        if: steps.config.outputs.build_enabled == 'true' && steps.config.outputs.create_release == 'true'
+        id: release_meta
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag_name="$GITHUB_REF_NAME"
+          else
+            tag_name="v${{ steps.app_version.outputs.version_name }}"
+          fi
+
+          echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
+          echo "release_name=${{ steps.config.outputs.release_name_prefix }} $tag_name" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        if: steps.config.outputs.build_enabled == 'true' && steps.config.outputs.create_release == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag_name }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ steps.release_meta.outputs.release_name }}
+          body_path: release/release-notes.md
+          files: release/*.apk

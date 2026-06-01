@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Yila NFC Helper</string>
+    <string name="toast_allow_nfc_tag">Allow Yila NFC Helper to receive NFC tags</string>
+    <string name="toast_ready">Yila NFC Helper is ready</string>
+    <string name="toast_launch_yila_failed">Failed to launch Yila Door: %1$s</string>
+</resources>
