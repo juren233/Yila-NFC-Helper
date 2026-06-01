@@ -1,8 +1,6 @@
 package com.juren233.nfcunlocker
 
 import android.app.Activity
-import android.content.ComponentName
-import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 
@@ -11,15 +9,7 @@ class RelayActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         try {
-            val unlockIntent = Intent("android.nfc.action.TAG_DISCOVERED").apply {
-                component = ComponentName(
-                    "com.macronum.bledemo",
-                    "com.macronum.bledemo.MainActivity"
-                )
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            startActivity(unlockIntent)
-            UpdateNotifier.checkAndNotify(this)
+            YilaLauncher.launch(this)
         } catch (exception: Exception) {
             Toast.makeText(
                 this,

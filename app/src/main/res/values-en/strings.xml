@@ -4,7 +4,5 @@
     <string name="toast_allow_nfc_tag">Allow Yila NFC Helper to receive NFC tags</string>
     <string name="toast_ready">Yila NFC Helper is ready</string>
     <string name="toast_launch_yila_failed">Failed to launch Yila Door: %1$s</string>
-    <string name="notification_update_title">Yila NFC Helper has an update</string>
-    <string name="notification_update_text">Tap to download the update</string>
-    <string name="notification_update_channel_name">App updates</string>
+    <string name="tile_unlock_label">One-tap Unlock</string>
 </resources>
