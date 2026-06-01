@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -34,7 +34,6 @@ jobs:
           echo "build_enabled=${BUILD_ENABLED:-true}" >> "$GITHUB_OUTPUT"
           echo "create_release=${CREATE_RELEASE:-false}" >> "$GITHUB_OUTPUT"
           echo "target_abis=${TARGET_ABIS:-arm64-v8a}" >> "$GITHUB_OUTPUT"
-          echo "release_name_prefix=${RELEASE_NAME_PREFIX:-Yila NFC Helper}" >> "$GITHUB_OUTPUT"
 
       - name: Stop when build is disabled
         if: steps.config.outputs.build_enabled != 'true'
@@ -42,7 +41,7 @@ jobs:
 
       - name: Set up JDK 21
         if: steps.config.outputs.build_enabled == 'true'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
@@ -104,36 +103,11 @@ jobs:
         if: steps.config.outputs.build_enabled == 'true'
         shell: bash
         run: |
-          {
-            echo "## Latest commit"
-            echo
-            echo "- Commit: \`$(git rev-parse HEAD)\`"
-            echo "- Author: $(git log -1 --pretty=format:'%an <%ae>')"
-            echo "- Date: $(git log -1 --pretty=format:'%cI')"
-            echo
-            echo "### Message"
-            echo
-            git log -1 --pretty=format:'%B'
-            echo
-            echo
-            echo "### Changed files"
-            echo
-            git show --name-status --format="" HEAD
-            echo
-            echo
-            echo "### Diff stat"
-            echo
-            git show --stat --format="" HEAD
-            echo
-            echo
-            echo "## Build config"
-            echo
-            echo "- Target ABIs: ${{ steps.config.outputs.target_abis }}"
-          } > release/release-notes.md
+          git log -1 --pretty=format:'%B' > release/release-notes.md
 
       - name: Upload APK artifact
         if: steps.config.outputs.build_enabled == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: yila-nfc-helper-apk
           path: release/*.apk
@@ -149,16 +123,29 @@ jobs:
           else
             tag_name="v${{ steps.app_version.outputs.version_name }}"
           fi
+          release_name="$tag_name"
 
           echo "tag_name=$tag_name" >> "$GITHUB_OUTPUT"
-          echo "release_name=${{ steps.config.outputs.release_name_prefix }} $tag_name" >> "$GITHUB_OUTPUT"
+          echo "release_name=$release_name" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         if: steps.config.outputs.build_enabled == 'true' && steps.config.outputs.create_release == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.release_meta.outputs.tag_name }}
-          target_commitish: ${{ github.sha }}
-          name: ${{ steps.release_meta.outputs.release_name }}
-          body_path: release/release-notes.md
-          files: release/*.apk
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag_name="${{ steps.release_meta.outputs.tag_name }}"
+          release_name="${{ steps.release_meta.outputs.release_name }}"
+
+          if gh release view "$tag_name" >/dev/null 2>&1; then
+            gh release edit "$tag_name" \
+              --target "$GITHUB_SHA" \
+              --title "$release_name" \
+              --notes-file release/release-notes.md
+            gh release upload "$tag_name" release/*.apk --clobber
+          else
+            gh release create "$tag_name" release/*.apk \
+              --target "$GITHUB_SHA" \
+              --title "$release_name" \
+              --notes-file release/release-notes.md
+          fi
