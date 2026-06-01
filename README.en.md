@@ -11,7 +11,7 @@
 <p align="center">
   <img alt="Android" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white" />
   <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-Android-7F52FF?logo=kotlin&logoColor=white" />
-  <img alt="Version" src="https://img.shields.io/github/v/release/juren233/Yila-NFC-Helper?label=version" />
+  <img alt="Version" src="https://img.shields.io/github/v/release/juren233/Yila-NFC-Helper?label=version&sort=semver" />
 </p>
 
 <p align="center">

@@ -96,7 +96,27 @@ jobs:
         shell: bash
         run: |
           mkdir -p release
-          find app/build/outputs/apk/release -maxdepth 1 -type f -name "*.apk" -print -exec cp {} release/ \;
+          version_tag="v${{ steps.app_version.outputs.version_name }}"
+          apks=(app/build/outputs/apk/release/*.apk)
+
+          if [[ ! -e "${apks[0]}" ]]; then
+            echo "No release APK found." >&2
+            exit 1
+          fi
+
+          for apk in "${apks[@]}"; do
+            file_name="$(basename "$apk")"
+
+            if [[ "$file_name" =~ ^app-(.+)-release\.apk$ ]]; then
+              abi="${BASH_REMATCH[1]}"
+            elif [[ "$file_name" == "app-release.apk" ]]; then
+              abi="universal"
+            else
+              abi="${file_name%.apk}"
+            fi
+
+            cp "$apk" "release/Yila-NFC-Helper-${version_tag}-${abi}.apk"
+          done
           test -n "$(find release -maxdepth 1 -type f -name '*.apk' -print -quit)"
 
       - name: Write release notes

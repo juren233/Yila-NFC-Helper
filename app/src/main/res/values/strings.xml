@@ -4,4 +4,7 @@
     <string name="toast_allow_nfc_tag">请允许易拉NFC辅助接收NFC标签</string>
     <string name="toast_ready">易拉NFC辅助已就绪</string>
     <string name="toast_launch_yila_failed">拉起易拉开门失败: %1$s</string>
+    <string name="notification_update_title">易拉NFC辅助App有更新版本</string>
+    <string name="notification_update_text">点击跳转下载更新</string>
+    <string name="notification_update_channel_name">应用更新</string>
 </resources>

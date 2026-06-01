@@ -19,6 +19,7 @@ class RelayActivity : Activity() {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(unlockIntent)
+            UpdateNotifier.checkAndNotify(this)
         } catch (exception: Exception) {
             Toast.makeText(
                 this,
